@@ -3,8 +3,8 @@
 use std::fs::File;
 use std::io::{Read, Write};
 
-use log::{error, info};
 use reqwest::blocking::Client;
+use crate::http::MakeCache::Cache;
 
 use crate::http::TryCheckin::CheckIn;
 use crate::pojo::cutom_pojo::{CustomAccount, CustomToken};
@@ -24,23 +24,23 @@ fn main() {
     let mut token_cache = get_token_cache().unwrap();
     let mut all_accounts = get_accounts().unwrap();
 
-    make_token_cache(&http_client, &mut all_accounts, &mut token_cache, None);
+    http_client.make_token_cache(&mut all_accounts, &mut token_cache, None);
     token_cache.try_checkin(&http_client);
 
-    if all_accounts.len() == token_cache.len() { return; }
+    if all_accounts.len() != token_cache.len() {
+        let mut new_user = Vec::new();
+        http_client.make_token_cache(&mut all_accounts, &mut token_cache, Some(&mut new_user));
+        new_user.try_checkin(&http_client);
 
-    let mut new_user = Vec::new();
-    make_token_cache(&http_client, &mut all_accounts, &mut token_cache, Some(&mut new_user));
-    new_user.try_checkin(&http_client);
-
-    cache_token(&token_cache);
+        cache_token(&token_cache);
+    }
 }
 
 fn cache_token(token_cache: & Vec<CustomToken>) {
     let mut file = File::create("config/Token_Cache.json").unwrap();
     file.write_all(serde_json::to_string_pretty(&token_cache).unwrap().as_bytes()).unwrap();
 }
-
+/*
 fn make_token_cache(
     http_client: &Client,
     all_accounts: &mut Vec<CustomAccount>,
@@ -75,7 +75,7 @@ fn make_token_cache(
 
     cache_token(&custom_token_list);
 }
-
+*/
 fn get_accounts() -> Result<Vec<CustomAccount>, serde_json::Error> {
     let mut file = File::open("config/Account.json").unwrap();
     let mut contents = String::new();
@@ -89,7 +89,8 @@ fn get_token_cache() -> Result<Vec<CustomToken>, serde_json::Error> {
         Ok(file) => file,
         Err(err) => {
             if err.kind() != std::io::ErrorKind::NotFound {
-                panic!("Problem opening the file: {:?}", err.to_string());
+                File::create("config/Token_Cache.json").expect("Failed to create cache file!");
+                return Ok(Vec::new());
             } else {
                 return Ok(Vec::new());
             }
