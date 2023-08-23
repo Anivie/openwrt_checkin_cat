@@ -1,0 +1,6 @@
+coreutils
+gtar
+lipo
+mktemp
+tmpdir
+zigbuild
